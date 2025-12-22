@@ -1,0 +1,4 @@
+%yaml
+llm_model_serving_endpoint_name: "databricks-gemma-3-12b"
+vector_search_endpoint_name: "dhbb-vector-search"
+vector_search_index: "dhbb-idx-vector-search"
