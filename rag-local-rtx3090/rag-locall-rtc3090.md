@@ -45,10 +45,10 @@ sudo dpkg -i cuda-keyring_1.0-1_all.deb
 sudo apt-get update
 sudo apt-get install cuda-toolkit-12-1
 
-### Passo 1.3: Instalar cuDNN 8.9.x
+### Passo 1.3: Instalar cuDNN 9.5.1
 
 1. Baixe em: https://developer.nvidia.com/cudnn (requer login gratuito)
-2. Selecione: **cuDNN 8.9.7** para CUDA 12.1
+2. Selecione: **cuDNN 9.5.1** para CUDA 12.1 (no site da NVIDIA diz 9.5.1), depois que instala aparece 9.17.1.4-1.
 3. Extraia e copie arquivos:
 
 **Windows:**
@@ -60,11 +60,12 @@ copy cudnn-windows-x86_64-8.9.7.29_cuda12-archive\lib\x64\*.lib "C:\Program File
 copy cudnn-windows-x86_64-8.9.7.29_cuda12-archive\include\*.h "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include"
 
 **Linux:**
-# Após extrair o tar.xz
-tar -xf cudnn-linux-x86_64-8.9.7.29_cuda12-archive.tar.xz
-sudo cp cudnn-linux-x86_64-8.9.7.29_cuda12-archive/bin/* /usr/local/cuda-12.1/bin/
-sudo cp cudnn-linux-x86_64-8.9.7.29_cuda12-archive/lib/* /usr/local/cuda-12.1/lib64/
-sudo cp cudnn-linux-x86_64-8.9.7.29_cuda12-archive/include/* /usr/local/cuda-12.1/include/
+# 4. Instalar cuDNN 9 para CUDA 12
+sudo apt-get install -y cudnn9-cuda-12
+
+# 5. Verificar instalação
+dpkg -l | grep cudnn
+# Deve mostrar cudnn9-cuda-12
 
 ### Passo 1.4: Adicionar CUDA às Variáveis de Ambiente
 
@@ -85,6 +86,12 @@ source ~/.bashrc
 nvcc --version
 # Output esperado: release 12.1, V12.1.66
 
+juliochaves@ERJ1753:~$ nvcc --version
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2023 NVIDIA Corporation
+Built on Mon_Apr__3_17:16:06_PDT_2023
+Cuda compilation tools, release 12.1, V12.1.105
+Build cuda_12.1.r12.1/compiler.32688072_0
 ---
 
 ## Parte 2: Setup Python e Ambiente Virtual
