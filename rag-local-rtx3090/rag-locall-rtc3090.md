@@ -21,9 +21,6 @@
 
 ### Passo 1.1: Verificar GPU e Drivers
 
-# Windows - No PowerShell/CMD
-nvidia-smi
-
 # Linux - No terminal
 nvidia-smi
 
@@ -33,11 +30,6 @@ Driver Version: 545.23.06
 CUDA Version: 12.1
 
 ### Passo 1.2: Instalar CUDA 12.1 (Se não tiver)
-
-**Windows:**
-1. Baixe em: https://developer.nvidia.com/cuda-12-1-0-download-archive
-2. Selecione: Windows → x86_64 → Windows 10/11 → exe (local)
-3. Execute o instalador e siga as instruções padrão
 
 **Linux (Ubuntu 22.04):**
 wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb
@@ -49,15 +41,6 @@ sudo apt-get install cuda-toolkit-12-1
 
 1. Baixe em: https://developer.nvidia.com/cudnn (requer login gratuito)
 2. Selecione: **cuDNN 9.5.1** para CUDA 12.1 (no site da NVIDIA diz 9.5.1), depois que instala aparece 9.17.1.4-1.
-3. Extraia e copie arquivos:
-
-**Windows:**
-# Após extrair o ZIP
-# Copie os arquivos para C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\
-
-copy cudnn-windows-x86_64-8.9.7.29_cuda12-archive\bin\*.dll "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\bin"
-copy cudnn-windows-x86_64-8.9.7.29_cuda12-archive\lib\x64\*.lib "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\lib\x64"
-copy cudnn-windows-x86_64-8.9.7.29_cuda12-archive\include\*.h "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1\include"
 
 **Linux:**
 # 4. Instalar cuDNN 9 para CUDA 12
@@ -68,11 +51,6 @@ dpkg -l | grep cudnn
 # Deve mostrar cudnn9-cuda-12
 
 ### Passo 1.4: Adicionar CUDA às Variáveis de Ambiente
-
-**Windows (PowerShell Admin):**
-[Environment]::SetEnvironmentVariable("CUDA_HOME", "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1", "User")
-[Environment]::SetEnvironmentVariable("CUDNN_HOME", "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1", "User")
-# Feche e reabra o PowerShell para aplicar
 
 **Linux:**
 echo 'export CUDA_HOME=/usr/local/cuda-12.1' >> ~/.bashrc
@@ -108,19 +86,10 @@ sudo apt-get install python3.10 python3.10-venv python3.10-dev
 
 ### Passo 2.2: Criar Diretório do Projeto
 
-# Windows
-mkdir C:\Users\SeuUsuario\rag-desktop
-cd C:\Users\SeuUsuario\rag-desktop
-
 # Linux
-mkdir ~/rag-desktop
-cd ~/rag-desktop
+cd rag-local-rtx3090
 
 ### Passo 2.3: Criar Ambiente Virtual
-
-# Windows
-python -m venv venv
-.\venv\Scripts\activate
 
 # Linux
 python3.10 -m venv venv
@@ -183,18 +152,64 @@ ipython==8.21.0
 
 ### Passo 3.2: Instalar PyTorch com CUDA 12.1
 
-# Este comando instala a versão correta para RTX3090
-pip install torch==2.2.0+cu121 torchvision==0.17.0+cu121 torchaudio==2.2.0+cu121 -f https://download.pytorch.org/whl/torch_cu121
+# 2. Atualizar pip
+pip install --upgrade pip setuptools wheel
 
-**Verificar instalação:**
-python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA disponível: {torch.cuda.is_available()}'); print(f'GPU: {torch.cuda.get_device_name(0)}')"
+# 3. Instalar PyTorch com CUDA 12.1 (última versão estável)
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
-**Output esperado:**
-PyTorch: 2.2.0+cu121
+# 4. Verificar instalação do PyTorch
+python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA: {torch.cuda.is_available()}'); print(f'GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}')"
+
+# 5. Instalar dependências do RAG
+pip install sentence-transformers==2.3.1
+pip install langchain==0.1.0
+pip install chromadb==0.4.22
+pip install transformers==4.36.2
+pip install numpy==1.24.3
+pip install pandas==2.1.4
+pip install tqdm==4.66.1
+pip install accelerate==0.25.0
+
+# 6. Verificar instalação completa
+python << 'EOF'
+import torch
+from sentence_transformers import SentenceTransformer
+import chromadb
+
+print("="*60)
+print("VERIFICAÇÃO DO AMBIENTE RAG")
+print("="*60)
+print(f"PyTorch: {torch.__version__}")
+print(f"CUDA disponível: {torch.cuda.is_available()}")
+print(f"Versão CUDA: {torch.version.cuda}")
+print(f"cuDNN versão: {torch.backends.cudnn.version()}")
+print(f"GPU: {torch.cuda.get_device_name(0)}")
+print(f"Memória GPU: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
+
+print("\nTestando Sentence Transformers na GPU...")
+model = SentenceTransformer('all-MiniLM-L6-v2')
+model = model.to('cuda')
+embeddings = model.encode(["Teste de GPU RTX3090"], device='cuda')
+print(f"✓ Embedding gerado: shape {embeddings.shape}")
+
+print("\n✓ Ambiente configurado com sucesso!")
+EOF
+
+Saída!
+============================================================
+VERIFICAÇÃO DO AMBIENTE RAG
+============================================================
+PyTorch: 2.5.1+cu121
 CUDA disponível: True
+Versão CUDA: 12.1
+cuDNN versão: 90100
 GPU: NVIDIA GeForce RTX 3090
+Memória GPU: 24.00 GB
 
 ### Passo 3.3: Instalar Pacotes Restantes
+
+pip install -r 1_requirements_torch.txt
 
 pip install -r requirements.txt
 
@@ -223,10 +238,7 @@ mkdir documents
 
 ### Passo 4.2: Exemplo de Arquivo de Teste
 
-Crie `documents/exemplo.txt`:
-A Inteligência Artificial está revolucionando o mundo. RAG combina recuperação com geração.
-LLMs como GPT e Claude usam transformers. O aprendizado de máquina avança rapidamente.
-Redes neurais convolucionais processam imagens. Transformers dominam NLP moderno.
+Crie `documents/<arquivos>.text`:
 
 ---
 

@@ -1,0 +1,36 @@
+# Embedding Models
+sentence-transformers==2.3.1
+transformers==4.36.2
+tokenizers==0.15.2
+safetensors==0.4.2
+
+# Vector Database
+chromadb==0.4.22
+pymilvus==2.4.15
+
+# LLM & RAG - Versões compatíveis
+langchain==0.1.20
+langchain-core==0.1.52
+langchain-community==0.0.38
+
+# Scientific Computing
+numpy==1.24.3
+pandas==2.1.4
+scipy==1.13.0
+scikit-learn==1.4.2
+
+# Configuration & I/O
+pydantic==2.6.4
+python-dotenv==1.0.1
+pyyaml==6.0.1
+
+# Progress & HTTP
+tqdm==4.66.1
+requests==2.31.0
+
+# GPU Acceleration
+accelerate==0.25.0
+
+# Development Tools
+jupyter==1.0.0
+ipython==8.21.0
