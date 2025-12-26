@@ -682,7 +682,7 @@ st.caption("💡 Coloque seus arquivos .txt em ./documents/ e recarregue a pági
 
 ### Passo 6.2: Instalar Streamlit
 
-pip install streamlit==1.31.1
+pip install streamlit==1.52.2
 
 ### Passo 6.3: Executar App Web
 

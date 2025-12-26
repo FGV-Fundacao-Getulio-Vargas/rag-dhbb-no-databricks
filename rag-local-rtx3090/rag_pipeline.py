@@ -73,7 +73,9 @@ class RAGPipeline:
         """Carregar todos os arquivos .text de um diretório"""
         documents = {}
         
-        txt_files = glob.glob(os.path.join(directory, "*.text"))
+        # Buscar tanto .txt quanto .text
+        txt_files = glob.glob(os.path.join(directory, "*.txt")) + \
+                    glob.glob(os.path.join(directory, "*.text"))
         
         if not txt_files:
             print(f"⚠️  Nenhum arquivo .text encontrado em {directory}")
@@ -245,11 +247,11 @@ Resposta:"""
         
         return prompt
     
-    def rag_query(self, query: str, verbose: bool = True) -> Dict:
+    def rag_query(self, query: str, verbose: bool = True, top_k: int = None) -> Dict:
         """Pipeline completo: query → retrieve → generate"""
         
-        # Recuperar
-        retrieved = self.retrieve(query)
+        # Recuperar (usando top_k customizado se fornecido)
+        retrieved = self.retrieve(query, top_k=top_k)
         
         if verbose:
             print(f"\n🔍 Query: {query}")
@@ -257,7 +259,7 @@ Resposta:"""
             
             for i, (chunk, score) in enumerate(retrieved, 1):
                 print(f"[{i}] Relevância: {score:.1%}")
-                print(f"    {chunk[:150]}...\n")
+                print(f"   {chunk[:150]}...\n")
         
         # Extrair apenas textos para geração
         context_texts = [chunk for chunk, _ in retrieved]
@@ -272,6 +274,7 @@ Resposta:"""
             'prompt': prompt,
             'scores': [score for _, score in retrieved]
         }
+
 
 
 # ============================================

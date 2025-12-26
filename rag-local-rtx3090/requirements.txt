@@ -34,3 +34,6 @@ accelerate==0.25.0
 # Development Tools
 jupyter==1.0.0
 ipython==8.21.0
+
+# tela
+streamlit==1.52.2
