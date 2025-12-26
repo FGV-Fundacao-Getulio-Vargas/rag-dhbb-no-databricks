@@ -738,11 +738,28 @@ CONFIG['model_name'] = 'sentence-transformers/all-minilm-l12-v2'  # 384-dim, mai
 
 **Comparativa de Modelos:**
 
+Todos são ruins para Português Brasil.
+
 | Modelo | Tamanho | Dimensão | Velocidade | Qualidade |
 |--------|---------|----------|-----------|-----------|
-| all-MiniLM-L6-v2 | 22 MB | 384 | ⚡⚡⚡ | ⭐⭐⭐ |
-| all-minilm-l12-v2 | 33 MB | 384 | ⚡⚡ | ⭐⭐⭐⭐ |
-| all-mpnet-base-v2 | 420 MB | 768 | ⚡ | ⭐⭐⭐⭐⭐ |
+| all-MiniLM-L6-v2 | 22 MB | 384 | ⚡⚡⚡ | ⭐⭐ |
+| all-mpnet-base-v2 | 420 MB | 768 | ⚡ | ⭐ |
+| PORTULAN/serafim-900m-portuguese-pt-sentence-encoder-ir | | |⚡⚡⚡ | ⭐⭐⭐⭐⭐ |
+
+As referências para português são:
+
+    # 🆕 Modelos Serafim para Português Brasil (escolha um)
+    # Opção 1: STS (Semantic Textual Similarity) - para similaridade semântica
+    'model_name': 'PORTULAN/serafim-100m-portuguese-pt-sentence-encoder',  # 100M, 768-dim
+    # 'model_name': 'PORTULAN/serafim-335m-portuguese-pt-sentence-encoder',  # 335M, 768-dim
+    # 'model_name': 'PORTULAN/serafim-900m-portuguese-pt-sentence-encoder',  # 900M, 1536-dim ⭐
+    
+    # Opção 2: IR (Information Retrieval) - MELHOR para RAG/busca
+    # 'model_name': 'PORTULAN/serafim-100m-portuguese-pt-sentence-encoder-ir',  # 100M, 768-dim
+    # 'model_name': 'PORTULAN/serafim-900m-portuguese-pt-sentence-encoder-ir',  # 900M, 1536-dim ⭐⭐
+    
+    # Alternativa: Modelo multilíngue com bom suporte a PT-BR
+    # 'model_name': 'sentence-transformers/paraphrase-multilingual-mpnet-base-v2',  # 278M, 768-dim
 
 ---
 
@@ -778,11 +795,56 @@ rag-desktop/
 
 ## Parte 10: Próximos Passos
 
+Com o PORTULAN/serafim-900m-portuguese-pt-sentence-encoder-ir ficou o resultado MUITO BOM.
+Os verbetes corretos estão sendo encontrados para as perguntas mais difíceis que enfrentamos nos outros modelos:
+
+Como morreu Ulysses Guimarães?
+
+Qual é o nome do Tiririca?
+
+Agora, o próximo passo é formatar uma resposta bonita via IA gen com os chunks retornados, daí podemos usar um mistral small ou outro pequeno e bom para PT BR.
+
 1. **Fine-tuning:** Treinar embedding model com seus dados
 2. **LLM Local:** Usar Ollama + Llama2 para gerar respostas
 3. **Reranking:** Adicionar cross-encoder para melhorar relevância
 4. **API REST:** Criar FastAPI para integração
 5. **Monitoring:** Usar MLflow para rastrear experimentos
+
+
+Agora que está funcionando com o Serafim-900M-IR, você tem:
+
+✅ Melhor modelo de embeddings para português brasileiro disponível atualmente
+
+✅ Detecção automática de nomes nos verbetes (formato "SOBRENOME, Nome")
+
+✅ Metadados completos (person_name, natureza, sexo, cargos, chunk_id)
+
+✅ Interface Streamlit com transparência total dos chunks recuperados
+
+✅ Filtragem inteligente por pessoa/atributos
+
+Melhorias opcionais que você pode considerar:
+Para qualidade:
+
+Testar serafim-1b5-portuguese-pt-sentence-encoder-ir se tiver VRAM disponível (estado da arte absoluto)
+
+Ajustar chunk_size e chunk_overlap baseado no tamanho médio dos seus verbetes
+
+Para performance:
+
+Cachear resultados de buscas frequentes
+
+Implementar re-ranking com cross-encoder para top-k pequeno
+
+Para produção:
+
+Adicionar logging estruturado
+
+Implementar monitoramento de latência
+
+Criar testes automatizados
+
+Seu sistema agora está usando tecnologia de ponta para português! 🇧🇷🚀
 
 ---
 

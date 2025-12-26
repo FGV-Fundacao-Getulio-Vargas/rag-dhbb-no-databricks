@@ -1,6 +1,6 @@
 """
 RAG Pipeline Local para Desktop com GPU RTX3090
-Otimizado para verbetes biográficos com metadados YAML
+Otimizado para verbetes biográficos com embeddings Serafim PT-BR
 """
 
 import os
@@ -18,14 +18,24 @@ from tqdm import tqdm
 # ============================================
 # CONFIGURAÇÃO
 # ============================================
-# https://huggingface.co/pierreguillou/bert-base-cased-squad-v1.1-portuguese
-# https://huggingface.co/PORTULAN/albertina-1b5-portuguese-ptbr-encoder
 CONFIG = {
     'device': 'cuda' if torch.cuda.is_available() else 'cpu',
-    'model_name': 'sentence-transformers/all-MiniLM-L6-v2',  # 22MB, 384-dim
-    'model_large_en': 'sentence-transformers/all-mpnet-base-v2',  # 420MB, 768-dim (fica horrível em PT)
+    
+    # 🆕 Modelos Serafim para Português Brasil (escolha um)
+    # Opção 1: STS (Semantic Textual Similarity) - para similaridade semântica
+    # 'model_name': 'PORTULAN/serafim-100m-portuguese-pt-sentence-encoder',  # 100M, 768-dim
+    # 'model_name': 'PORTULAN/serafim-335m-portuguese-pt-sentence-encoder',  # 335M, 768-dim
+    # 'model_name': 'PORTULAN/serafim-900m-portuguese-pt-sentence-encoder',  # 900M, 1536-dim ⭐
+    # Opção 2: IR (Information Retrieval) - MELHOR para RAG/busca
+    # 'model_name': 'PORTULAN/serafim-100m-portuguese-pt-sentence-encoder-ir',  # 100M, 768-dim
+    'model_name': 'PORTULAN/serafim-900m-portuguese-pt-sentence-encoder-ir',  # 900M, 1536-dim ⭐⭐⭐⭐⭐
+        # nem acredito!
+    # Alternativa: Modelo multilíngue com bom suporte a PT-BR
+    # 'model_name': 'sentence-transformers/paraphrase-multilingual-mpnet-base-v2',  # 278M, 768-dim
+    # 'model_name': 'sentence-transformers/all-MiniLM-L6-v2',  # 22MB, 384-dim o padrão usado pelo George
+    
     'chunk_size': 1000,
-    'chunk_overlap': 200,
+    'chunk_overlap': 300,
     'top_k': 3,
     'embeddings_cache': 'chromadb_storage',
     'documents_dir': './documents'
@@ -43,11 +53,9 @@ if CONFIG['device'] == 'cuda':
 def extract_person_name(content):
     """Extrai o nome da pessoa do cabeçalho do verbete"""
     try:
-        # Procura o padrão "title: SOBRENOME, Nome" no início do arquivo
         match = re.search(r'^title:\s*(.+?)(?:\n|$)', content, re.MULTILINE)
         if match:
             full_name = match.group(1).strip()
-            # Remove possíveis aspas
             full_name = full_name.strip('"').strip("'")
             return full_name
         return "Nome não identificado"
@@ -66,28 +74,23 @@ def extract_metadata_from_yaml(content):
     }
     
     try:
-        # Extrai o bloco YAML entre --- ---
         yaml_match = re.search(r'^---\s*\n(.*?)\n---', content, re.DOTALL | re.MULTILINE)
         
         if yaml_match:
             yaml_content = yaml_match.group(1)
             
-            # Extrai title (nome da pessoa)
             title_match = re.search(r'title:\s*(.+?)(?:\n|$)', yaml_content)
             if title_match:
                 metadata["person_name"] = title_match.group(1).strip().strip('"').strip("'")
             
-            # Extrai natureza
             natureza_match = re.search(r'natureza:\s*(.+?)(?:\n|$)', yaml_content)
             if natureza_match:
                 metadata["natureza"] = natureza_match.group(1).strip()
             
-            # Extrai sexo
             sexo_match = re.search(r'sexo:\s*(.+?)(?:\n|$)', yaml_content)
             if sexo_match:
                 metadata["sexo"] = sexo_match.group(1).strip()
             
-            # Extrai cargos (lista)
             cargos_section = re.search(r'cargos:\s*\n((?:\s+-\s+.+\n?)+)', yaml_content)
             if cargos_section:
                 cargos_text = cargos_section.group(1)
@@ -114,12 +117,11 @@ def load_text_files_as_chunks_splitted(folder_path, chunk_size=1000, chunk_overl
     
     print(f"✓ Encontrados {len(text_files)} arquivos .text\n")
     
-    # 🆕 Configurar text splitter
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,  # Tamanho de cada chunk
-        chunk_overlap=chunk_overlap,  # Overlap para manter contexto
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
         length_function=len,
-        separators=["\n\n", "\n", ". ", " ", ""]  # Prioriza quebras naturais
+        separators=["\n\n", "\n", ". ", " ", ""]
     )
     
     for file_path in sorted(text_files):
@@ -128,18 +130,15 @@ def load_text_files_as_chunks_splitted(folder_path, chunk_size=1000, chunk_overl
                 content = file.read()
                 file_name = os.path.basename(file_path)
                 
-                # Extrai metadados do YAML
                 yaml_metadata = extract_metadata_from_yaml(content)
                 person_name = yaml_metadata["person_name"]
                 
-                # 🆕 Dividir documento em chunks
                 chunks = text_splitter.split_text(content)
                 
                 print(f" ✓ {file_name}")
                 print(f"   👤 Pessoa: {person_name}")
                 print(f"   📄 Total: {len(content)} caracteres → {len(chunks)} chunks\n")
                 
-                # Criar documento para cada chunk
                 for i, chunk in enumerate(chunks):
                     doc = Document(
                         page_content=chunk,
@@ -150,8 +149,8 @@ def load_text_files_as_chunks_splitted(folder_path, chunk_size=1000, chunk_overl
                             "natureza": yaml_metadata["natureza"],
                             "sexo": yaml_metadata["sexo"],
                             "cargos": ", ".join(yaml_metadata["cargos"]) if yaml_metadata["cargos"] else None,
-                            "chunk_id": i,  # 🆕 Identificador do chunk
-                            "total_chunks": len(chunks)  # 🆕 Total de chunks do documento
+                            "chunk_id": i,
+                            "total_chunks": len(chunks)
                         }
                     )
                     docs.append(doc)
@@ -167,18 +166,27 @@ def load_text_files_as_chunks_splitted(folder_path, chunk_size=1000, chunk_overl
 # ============================================
 class RAGPipeline:
     def __init__(self, config: Dict):
-        """Inicializar pipeline RAG"""
+        """Inicializar pipeline RAG com Serafim PT"""
         self.config = config
         self.device = config['device']
         
-        print("\n[1/4] Carregando modelo de embedding...")
-        self.embedding_model = SentenceTransformer(
-            config['model_name'],
-            device=self.device
-        )
-        self.embedding_dim = self.embedding_model.get_sentence_embedding_dimension()
-        print(f"   ✓ Modelo carregado: {config['model_name']}")
-        print(f"   ✓ Dimensão embeddings: {self.embedding_dim}")
+        print("\n[1/4] Carregando modelo de embedding Serafim PT...")
+        print(f"   📦 Modelo: {config['model_name']}")
+        
+        try:
+            self.embedding_model = SentenceTransformer(
+                config['model_name'],
+                device=self.device,
+                trust_remote_code=True  # 🆕 Necessário para modelos Serafim
+            )
+            self.embedding_dim = self.embedding_model.get_sentence_embedding_dimension()
+            print(f"   ✓ Modelo carregado com sucesso!")
+            print(f"   ✓ Dimensão embeddings: {self.embedding_dim}")
+        except Exception as e:
+            print(f"   ❌ Erro ao carregar modelo: {str(e)}")
+            print(f"   💡 Tentando instalar dependências...")
+            print(f"   💡 Execute: pip install sentence-transformers transformers torch")
+            raise
         
         print("\n[2/4] Inicializando ChromaDB...")
         self.client = chromadb.PersistentClient(
@@ -228,7 +236,7 @@ class RAGPipeline:
         print(f"\n📊 Processando documentos...\n")
         
         # Fase 1: Gerar embeddings (em batches)
-        print(f"[Fase 1] Gerando embeddings (batch size=32)...")
+        print(f"[Fase 1] Gerando embeddings com Serafim PT (batch size=32)...")
         batch_size = 32
         embeddings = []
         
@@ -241,7 +249,8 @@ class RAGPipeline:
                 batch_embeddings = self.embedding_model.encode(
                     texts,
                     convert_to_tensor=True,
-                    show_progress_bar=False
+                    show_progress_bar=False,
+                    normalize_embeddings=True  # 🆕 Normalização recomendada para IR
                 )
                 batch_embeddings = batch_embeddings.cpu().numpy().tolist()
                 embeddings.extend(batch_embeddings)
@@ -251,15 +260,13 @@ class RAGPipeline:
         # Fase 2: Armazenar em ChromaDB
         print(f"\n[Fase 2] Armazenando em ChromaDB...")
         
-        # Função auxiliar para limpar metadados (remover None)
         def clean_metadata(metadata: Dict) -> Dict:
-            """Remove valores None dos metadados (ChromaDB não aceita None)"""
+            """Remove valores None dos metadados"""
             return {
                 key: value for key, value in metadata.items() 
                 if value is not None
             }
         
-        # Preparar dados para ChromaDB
         ids = [f'chunk_{i:06d}' for i in range(len(documents))]
         documents_list = [doc.page_content for doc in documents]
         metadatas = [
@@ -267,9 +274,9 @@ class RAGPipeline:
                 'source': doc.metadata['source'],
                 'file_path': doc.metadata['file_path'],
                 'person_name': doc.metadata['person_name'],
-                'natureza': doc.metadata.get('natureza', ''),  # Default vazio se None
-                'sexo': doc.metadata.get('sexo', ''),  # Default vazio se None
-                'cargos': doc.metadata.get('cargos') or '',  # Default vazio se None
+                'natureza': doc.metadata.get('natureza') or '',
+                'sexo': doc.metadata.get('sexo') or '',
+                'cargos': doc.metadata.get('cargos') or '',
                 'chunk_id': doc.metadata['chunk_id'],
                 'total_chunks': doc.metadata['total_chunks'],
                 'char_count': len(doc.page_content)
@@ -296,7 +303,6 @@ class RAGPipeline:
         print(f"   • Pessoas diferentes: {len(set(doc.metadata['person_name'] for doc in documents))}")
         print(f"   • Coleção: 'documents' em {self.config['embeddings_cache']}")
 
-
     def retrieve(self, query: str, top_k: int = None, filters: Dict = None) -> List[Tuple[str, float, Dict]]:
         """Buscar chunks mais relevantes com metadados"""
         if top_k is None:
@@ -306,10 +312,11 @@ class RAGPipeline:
             print("❌ Nenhuma coleção carregada. Execute process_documents_with_metadata() primeiro.")
             return []
         
-        # Gerar embedding da query
+        # Gerar embedding da query com normalização
         query_embedding = self.embedding_model.encode(
             query,
-            convert_to_tensor=True
+            convert_to_tensor=True,
+            normalize_embeddings=True  # 🆕 Normalização para consistência
         ).cpu().numpy().tolist()
         
         # Buscar no ChromaDB (com filtros opcionais)
@@ -339,8 +346,7 @@ class RAGPipeline:
         
         context_text = "\n\n".join(context[:3])
         
-        # Template de prompt
-        prompt = f"""Baseado no contexto abaixo, responda a pergunta feita por uma pessoa interessada na história recente do Brasil.
+        prompt = f"""Baseado no contexto abaixo, responda a pergunta do usuário.
 
 Contexto:
 {context_text}
@@ -353,7 +359,6 @@ Resposta:"""
 
     def rag_query(self, query: str, verbose: bool = True, top_k: int = None, filters: Dict = None) -> Dict:
         """Pipeline completo: query → retrieve → generate"""
-        # Recuperar (usando top_k customizado se fornecido)
         retrieved = self.retrieve(query, top_k=top_k, filters=filters)
         
         if verbose:
@@ -369,10 +374,7 @@ Resposta:"""
                 print(f"   🔢 Chunk: {metadata.get('chunk_id', 'N/A')}/{metadata.get('total_chunks', 'N/A')}")
                 print(f"   {chunk[:150]}...\n")
         
-        # Extrair apenas textos para geração
         context_texts = [chunk for chunk, _, _ in retrieved]
-        
-        # Gerar
         prompt = self.generate_response(query, context_texts)
         
         return {
@@ -401,18 +403,17 @@ if __name__ == "__main__":
         
         # Exemplos de queries
         test_queries = [
-            "Qual é o assunto principal?",
             "Qual foi a missão de Abbink?",
+            "Quem foi Ulysses Guimarães?",
             "Explique sobre a vice-governadora do DF"
         ]
         
         print("\n" + "="*70)
-        print("TESTANDO RAG")
+        print("TESTANDO RAG COM SERAFIM PT")
         print("="*70)
         
         for query in test_queries:
             result = rag.rag_query(query)
-            # Separador
             print("-"*70 + "\n")
         
         # Exemplo de busca com filtros
@@ -420,7 +421,6 @@ if __name__ == "__main__":
         print("TESTANDO BUSCA COM FILTROS")
         print("="*70)
         
-        # Buscar apenas mulheres
         result = rag.rag_query(
             "Quais foram os principais cargos?",
             filters={"sexo": "f"}
