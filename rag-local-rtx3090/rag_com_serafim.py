@@ -33,10 +33,10 @@ CONFIG = {
     # Alternativa: Modelo multilíngue com bom suporte a PT-BR
     # 'model_name': 'sentence-transformers/paraphrase-multilingual-mpnet-base-v2',  # 278M, 768-dim
     # 'model_name': 'sentence-transformers/all-MiniLM-L6-v2',  # 22MB, 384-dim o padrão usado pelo George
-    
-    'chunk_size': 1000,
+    # 'model_name': 'intfloat/multilingual-e5-large',  # 420MB, 768-dim
+    'chunk_size': 2000,
     'chunk_overlap': 300,
-    'top_k': 3,
+    'top_k': 5,
     'embeddings_cache': 'chromadb_storage',
     'documents_dir': './documents'
 }
