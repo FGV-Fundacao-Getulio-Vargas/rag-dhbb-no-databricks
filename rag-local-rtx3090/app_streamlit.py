@@ -382,7 +382,7 @@ if query:
                     st.text_area(
                         label="Chunk",
                         value=chunk,
-                        height=200,
+                        height=300,
                         key=f"chunk_{i}",
                         label_visibility="collapsed"
                     )
