@@ -1,9 +1,12 @@
 """
 Interface Streamlit para RAG Local com Detecção de Verbetes
++ Geração de Resposta com Mistral Nemo Instruct
 """
 
 import streamlit as st
 import re
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from rag_com_serafim import RAGPipeline, CONFIG
 
 # Page config
@@ -173,8 +176,24 @@ with st.sidebar:
     )
     
     st.divider()
+    st.subheader("🤖 Geração IA")
+    enable_ai_response = st.checkbox("Gerar resposta com IA", value=True)
+    
+    if enable_ai_response:
+        max_tokens = st.slider(
+            "Máx. tokens na resposta",
+            min_value=128,
+            max_value=1024,
+            value=512,
+            step=64
+        )
+    else:
+        max_tokens = 512
+    
+    st.divider()
     st.caption(f"📊 Device: {CONFIG['device'].upper()}")
-    st.caption(f"📦 Modelo: {CONFIG['model_name'].split('/')[-1]}")
+    st.caption(f"📦 Embedding: {CONFIG['model_name'].split('/')[-1]}")
+    st.caption(f"🤖 LLM: Mistral Nemo Instruct 2407")
     
     # Botão para reprocessar documentos
     if st.button("🔄 Reprocessar Documentos"):
@@ -196,12 +215,96 @@ def load_pipeline():
         st.sidebar.warning("⚠️ Collection não encontrada. Execute o processamento primeiro.")
     return rag
 
+
+@st.cache_resource
+def load_mistral_model():
+    """Carrega o modelo Mistral Nemo Instruct para geração de respostas"""
+    model_id = "mistralai/Mistral-Nemo-Instruct-2407"
+    
+    try:
+        # Usar AutoTokenizer do transformers
+        tokenizer = AutoTokenizer.from_pretrained(model_id)
+        
+        model = AutoModelForCausalLM.from_pretrained(
+            model_id,
+            torch_dtype=torch.bfloat16,
+            device_map="auto",
+            low_cpu_mem_usage=True
+        )
+        
+        return model, tokenizer
+    except Exception as e:
+        st.sidebar.error(f"❌ Erro ao carregar Mistral: {str(e)}")
+        return None, None
+
+
+def generate_ai_response(model, tokenizer, query: str, chunks: list, max_new_tokens: int = 512) -> str:
+    """Gera uma resposta usando o modelo Mistral baseada nos chunks recuperados"""
+    
+    if model is None:
+        return "❌ Modelo não disponível para geração de resposta."
+    
+    # Combinar chunks em contexto
+    context = "\n\n---\n\n".join(chunks[:5])  # Limitar a 5 chunks para não exceder contexto
+    
+    # Criar mensagens no formato Mistral chat
+    messages = [
+        {
+            "role": "system",
+            "content": """Você é um assistente especializado em história política brasileira, 
+especificamente sobre o Dicionário Histórico-Biográfico Brasileiro (DHBB). 
+Responda de forma clara, precisa e em português brasileiro. 
+Baseie sua resposta APENAS nas informações fornecidas no contexto abaixo. 
+Se a informação não estiver no contexto, diga que não encontrou a informação."""
+        },
+        {
+            "role": "user",
+            "content": f"""Com base no seguinte contexto do DHBB:
+
+{context}
+
+---
+
+Pergunta: {query}
+
+Responda de forma completa e organizada:"""
+        }
+    ]
+    
+    try:
+        # Aplicar template de chat do tokenizer
+        prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        
+        # Tokenizar
+        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+        input_length = inputs["input_ids"].shape[1]
+        
+        # Gerar resposta
+        with torch.no_grad():
+            outputs = model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=True,
+                temperature=0.7,
+                top_p=0.9,
+                pad_token_id=tokenizer.eos_token_id
+            )
+        
+        # Decodificar apenas os novos tokens
+        response = tokenizer.decode(outputs[0][input_length:], skip_special_tokens=True)
+        
+        return response
+        
+    except Exception as e:
+        return f"❌ Erro na geração: {str(e)}"
+
+
 rag = load_pipeline()
 
 # Verificar se há collection
 if rag.collection is None:
     st.warning("⚠️ Nenhum documento processado ainda!")
-    st.info("Execute primeiro: `python rag_pipeline.py` para processar seus documentos.")
+    st.info("Execute primeiro: `python rag_com_serafim.py` para processar seus documentos.")
     st.stop()
 
 # Verificar se há documentos na collection
@@ -386,6 +489,41 @@ if submit_button and query:
                     # Botão para copiar
                     if st.button(f"📋 Copiar chunk {i}", key=f"copy_{query}_{i}"):
                         st.code(chunk, language=None)
+        
+        # ============================================
+        # RESPOSTA GERADA POR IA
+        # ============================================
+        if enable_ai_response:
+            st.divider()
+            st.subheader("🤖 Resposta Gerada por IA (Mistral Nemo Instruct)")
+            
+            with st.spinner("🧠 Carregando modelo e gerando resposta..."):
+                # Carregar modelo Mistral
+                model, tokenizer = load_mistral_model()
+                
+                if model is not None:
+                    # Gerar resposta
+                    ai_response = generate_ai_response(
+                        model, 
+                        tokenizer, 
+                        query, 
+                        result['context'],
+                        max_new_tokens=max_tokens
+                    )
+                    
+                    # Exibir resposta em container destacado
+                    st.markdown("---")
+                    st.markdown(ai_response)
+                    st.markdown("---")
+                    
+                    # Botão para copiar resposta
+                    if st.button("📋 Copiar resposta", key=f"copy_ai_{query}"):
+                        st.code(ai_response, language=None)
+                    
+                    st.caption("⚠️ Esta resposta foi gerada por IA com base nos chunks recuperados. Verifique as informações nos chunks originais.")
+                else:
+                    st.error("❌ Não foi possível carregar o modelo Mistral Nemo Instruct.")
+                    st.info("💡 Certifique-se de ter acesso ao modelo em https://huggingface.co/mistralai/Mistral-Nemo-Instruct-2407")
 
 st.divider()
 st.caption("💡 Coloque seus arquivos .text em ./documents/ e execute `python rag_pipeline.py`")

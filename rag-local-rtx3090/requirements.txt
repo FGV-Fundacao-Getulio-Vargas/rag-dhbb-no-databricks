@@ -1,39 +1,40 @@
 # Embedding Models
-sentence-transformers==5.2.0
-transformers==4.36.2
-tokenizers==0.15.2
-safetensors==0.4.2
+sentence-transformers==3.0.1
+transformers==4.44.0
+tokenizers==0.19.1
+safetensors==0.4.4
 
 # Vector Database
-chromadb==0.4.22
+chromadb==0.4.24
 pymilvus==2.4.15
 
-# LLM & RAG - Versões compatíveis
-langchain==0.1.20
-langchain-core==0.1.52
-langchain-community==0.0.38
+# LLM & RAG - Versões compatíveis com numpy 1.x
+langchain==0.2.16
+langchain-core==0.2.40
+langchain-community==0.2.17
+langchain-text-splitters==0.2.4
 
-# Scientific Computing
-numpy==1.24.3
+# Scientific Computing - numpy 1.x para compatibilidade
+numpy==1.26.4
 pandas==2.1.4
 scipy==1.13.0
-scikit-learn==1.4.2
+scikit-learn==1.5.1
 
 # Configuration & I/O
-pydantic==2.6.4
+pydantic==2.8.2
 python-dotenv==1.0.1
 pyyaml==6.0.1
 
 # Progress & HTTP
-tqdm==4.66.1
-requests==2.31.0
+tqdm==4.66.4
+requests==2.32.3
 
 # GPU Acceleration
-accelerate==0.25.0
+accelerate==0.33.0
 
 # Development Tools
 jupyter==1.0.0
-ipython==8.21.0
+ipython==8.26.0
 
 # tela
-streamlit==1.52.2
+streamlit==1.37.1
